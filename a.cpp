@@ -2,101 +2,111 @@
 #include <iostream>
 #include <vector>
 #include <queue>
-#include <utility>
-#include <limits>
+
+typedef int64_t dist_t;
+typedef int64_t vertex_t;
+typedef int64_t weight_t;
 
 class Graph {
 public:
-    virtual void insert_edge(const int32_t& first, const int32_t& second) = 0;
+    virtual void insert_edge(const vertex_t& first, const vertex_t& second,
+                             const weight_t& weight = 0) = 0;
 
-    virtual int32_t finding_shortest_path_with_saving(std::vector<int32_t>& answer,
-                                                      const int32_t& start,
-                                                      const int32_t& end) = 0;
+    virtual dist_t finding_shortest_path_with_saving(std::vector<vertex_t>& answer,
+                                                      const vertex_t& start,
+                                                      const vertex_t& end) = 0;
 };
 
+// GraphList uses adjacency list for edges
 class GraphList final : public Graph {
 public:
-    explicit GraphList(size_t vertexesNum, size_t edgesNum) {
+    explicit GraphList(size_t vertexesNum) {
         vertexesNum_ = vertexesNum;
-        edgesNum_ = edgesNum;
-        edges_.resize(vertexesNum_ + 1, {});
+        edges_.resize(vertexesNum_, {});
+        kMaxValue_ = vertexesNum + 1;
     }
 
-    void insert_edge(const int32_t& first, const int32_t& second) {
-        edges_[first].push_back(second);
-        edges_[second].push_back(first);
+    void insert_edge(const vertex_t& first, const vertex_t& second,
+                                            const weight_t& weight = 0) {
+        edges_[first - 1].push_back(second - 1);
+        edges_[second - 1].push_back(first - 1);
     }
 
-    int32_t finding_shortest_path_with_saving(std::vector<int32_t>& answer,
-                                          const int32_t& start,
-                                          const int32_t& end) {
-        return finding_shortest_path_with_saving_private(answer, start, end);
+    dist_t finding_shortest_path_with_saving(std::vector<vertex_t>& answer,
+                                             const vertex_t& start,
+                                             const vertex_t& end) {
+        std::vector<dist_t> dist(vertexesNum_, kMaxValue_);
+        std::vector<vertex_t> prev(vertexesNum_, 0);
+        std::queue<vertex_t> tempQueue;
+
+        tempQueue.push(start - 1);
+        dist[start - 1] = 0;
+
+        vertex_t currentVertex = 0;
+
+        while (!tempQueue.empty()) {
+            currentVertex = tempQueue.front();
+            tempQueue.pop();
+
+            for (int32_t currentNeighbour : edges_[currentVertex]) {
+                if (dist[currentNeighbour] == kMaxValue_) {
+                    dist[currentNeighbour] = dist[currentVertex] + 1;
+                    prev[currentNeighbour] = currentVertex;
+
+                    tempQueue.push(currentNeighbour);
+                }
+            }
+        }
+        if (dist[end - 1] == kMaxValue_) {
+            return kErrorCode_;
+        }
+        
+        dist_t length = dist[end - 1];
+        
+        normalize_path(prev, answer, length, end - 1);
+
+        return length;
     }
     
 private:
     size_t vertexesNum_;
-    size_t edgesNum_;
-    std::vector<std::vector<int32_t>> edges_; // using adjacency list
+    std::vector<std::vector<vertex_t>> edges_; // using adjacency list
+    size_t kMaxValue_;
+    const int8_t kErrorCode_ = -1;
 
-    int32_t finding_shortest_path_with_saving_private(std::vector<int32_t>& answer,
-                                                      const int32_t& start,
-                                                      const int32_t& end) {
-        std::vector<size_t> dist(vertexesNum_ + 1, vertexesNum_ + 1);
-        std::vector<size_t> prev(vertexesNum_ + 1, 0);
-        std::queue<int32_t> tempQueue;
-        tempQueue.push(start);
-        dist[start] = 0;
-        int32_t elem_v = 0;
+    void normalize_path(const std::vector<vertex_t>& prev, std::vector<vertex_t>& answer, const dist_t& length, const vertex_t& end) {
+        vertex_t current = prev[end];
+        answer.push_back(end + 1);
 
-        while (!tempQueue.empty()) {
-            elem_v = tempQueue.front();
-            tempQueue.pop();
-            for (int32_t elem_u : edges_[elem_v]) {
-                if (dist[elem_u] == vertexesNum_ + 1) {
-                    dist[elem_u] = dist[elem_v] + 1;
-                    prev[elem_u] = elem_v;
-                    tempQueue.push(elem_u);
-                }
-            }
+        for (int32_t i = 0; i < length; ++i) {
+            answer.push_back(current + 1);
+            current = prev[current];
         }
-        if (dist[end] == vertexesNum_ + 1) {
-            return -1;
-        }
-        
-        int32_t lenth = dist[end];
-        int32_t last = prev[end];
-        answer.push_back(end);
-        for (int32_t i = 0; i < lenth; ++i) {
-            answer.push_back(last);
-            last = prev[last];
-        }
-
-        return lenth;
     }
 };
 
 int main() {
-    int32_t n = 0;
-    int32_t m = 0;
-    std::cin >> n >> m;
+    int32_t vertexNum = 0;
+    int32_t edgesNum = 0;
+    std::cin >> vertexNum >> edgesNum;
 
-    int32_t a = 0;
-    int32_t b = 0;
-    std::cin >> a >> b;
+    vertex_t start = 0;
+    vertex_t end = 0;
+    std::cin >> start >> end;
 
-    GraphList graph(n, m);
-    int32_t first = 0;
-    int32_t second = 0;
-    for (int32_t i = 0; i < m; ++i) {
+    GraphList graph(vertexNum);
+    vertex_t first = 0;
+    vertex_t second = 0;
+    for (size_t i = 0; i < edgesNum; ++i) {
         std::cin >> first >> second;
         graph.insert_edge(first, second);
     }
 
-    std::vector<int32_t> answer = {};
-    int32_t lenth = graph.finding_shortest_path_with_saving(answer, a, b);
+    std::vector<vertex_t> answer = {};
+    dist_t length = graph.finding_shortest_path_with_saving(answer, start, end);
 
-    std::cout << lenth << std::endl;
-    for (int32_t i = 0; i < lenth + 1; ++i) {
+    std::cout << length << std::endl;
+    for (int32_t i = 0; i < length + 1; ++i) {
         std::cout << answer.back() << " ";
         answer.pop_back();
     }
