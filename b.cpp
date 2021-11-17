@@ -1,117 +1,153 @@
 #include <algorithm>
+#include <climits>
 #include <iostream>
 #include <vector>
 
-typedef int64_t dist_t;
-typedef int64_t vertex_t;
-typedef int64_t weight_t;
+typedef int32_t dist_t;
+typedef int32_t vertex_t;
+typedef int32_t weight_t;
 
 class Graph {
-protected:
+public:
     struct GraphNeighboursNode {
-        weight_t weight_;
         vertex_t vertex_;
+        weight_t weight_;
+    };
+
+    struct Edge {
+        vertex_t from_;
+        vertex_t to_;
+        weight_t weight_;
+        int32_t number_;
+
+        friend bool operator<(const Edge& first, const Edge& second) {
+            return first.from_ < second.from_ || (first.from_ == second.from_ && first.to_ <= second.to_);
+        }
+
+        friend bool operator==(const Edge& first, const Edge& second) {
+            return first.from_ == second.from_ && first.to_ == second.to_ && first.weight_ == second.weight_;
+        }
     };
 
     typedef enum {
-        WHITE_COLOUR = 0,
-        GREY_COLOUR = 1,
-        BLACK_COLOUR = 2,
+        WHITE_COLOUR,
+        GREY_COLOUR,
+        BLACK_COLOUR,
     } vertex_colours_t;
 
+    bool isOriented_ = false;
+
+    static const int32_t UNDEFINED;
+
+    size_t get_vertexes_num() const {
+        return vertexesNum_;
+    }
+
+    size_t get_edges_num() const {
+        return edgesNum_;
+    }
+
+    virtual std::vector<vertex_t> get_neighbours_vertex(const vertex_t& vert) const = 0;
+    virtual std::vector<weight_t> get_neighbours_weight(const vertex_t& vert) const = 0;
+    virtual std::vector<GraphNeighboursNode> get_neighbours(const vertex_t& vert) const = 0;
+    virtual void insert_edge(const vertex_t& x, const vertex_t& y, const weight_t& weight = 0) = 0;
+
+protected:
     size_t vertexesNum_;
     size_t edgesNum_;
-    bool isOriented_;
-
-    virtual std::vector<vertex_t> get_neighbours_vertex(const vertex_t& vert) = 0;
-    virtual std::vector<weight_t> get_neighbours_weight(const vertex_t& vert) = 0;
-    virtual std::vector<GraphNeighboursNode> get_neighbours(const vertex_t& vert) = 0;
-
-public:
-    virtual void insert_edge(const vertex_t& first, const vertex_t& second, const weight_t& weight = 0) = 0;
 };
 
 class GraphTable final : public Graph {
 public:
-    explicit GraphTable(size_t vertexesNum, size_t edgesNum) {
+    explicit GraphTable(size_t vertexesNum, size_t edgesNum, bool isOriented = false) {
         vertexesNum_ = vertexesNum;
         edgesNum_ = edgesNum;
-        std::vector<weight_t> nullsLine(vertexesNum_, 0);
-        adjacencyTable_.resize(vertexesNum_, nullsLine);
+        isOriented_ = isOriented;
+        std::vector<weight_t> nullsLine(vertexesNum_ + 1, 0);
+        adjacencyTable_.resize(vertexesNum_ + 1, nullsLine);
     }
 
-    void insert_edge(const vertex_t& first, const vertex_t& second, const weight_t& weight = 0) {
-        adjacencyTable_[first - 1][second - 1] = true;
-        adjacencyTable_[second - 1][first - 1] = true;
-    }
-
-    bool is_bipartite() {
-        std::vector<GraphTableNode> isVertexUsed(vertexesNum_, {false, WHITE_COLOUR});
-        for (size_t currentVertex = 0; currentVertex < vertexesNum_; ++currentVertex) {
-            if (!isVertexUsed[currentVertex].is_used) {
-                isVertexUsed[currentVertex].is_used = true;
-                isVertexUsed[currentVertex].colour = GREY_COLOUR;
-                if (!check_connectivity_component(currentVertex, isVertexUsed)) {
-                    return false;
-                }
-            }
+    void insert_edge(const vertex_t& first, const vertex_t& second, const weight_t& weight = 1) {
+        if (isOriented_) {
+            insert_edge_oriented(first, second, weight);
+        } else {
+            insert_edge_not_oriented(first, second, weight);
         }
-        return true;
     }
 
-protected:
-    std::vector<vertex_t> get_neighbours_vertex(const vertex_t& vert) {
+    std::vector<vertex_t> get_neighbours_vertex(const vertex_t& vert) const {
         std::vector<vertex_t> answer = {};
-        for (vertex_t currentVertex; currentVertex < vertexesNum_; ++currentVertex) {
-            if (adjacencyTable_[vert][currentVertex]) {
+        for (vertex_t currentVertex = 0; currentVertex < vertexesNum_; ++currentVertex) {
+            if (adjacencyTable_[vert][currentVertex] > 0) {
                 answer.push_back(currentVertex);
             }
         }
         return answer;
     }
 
-    std::vector<weight_t> get_neighbours_weight(const vertex_t& vert) {
+    std::vector<weight_t> get_neighbours_weight(const vertex_t& vert) const {
         std::vector<weight_t> answer = {};
-        for (vertex_t currentVertex; currentVertex < vertexesNum_; ++currentVertex) {
-            answer.push_back(adjacencyTable_[vert][currentVertex]);
+        for (vertex_t currentVertex = 0; currentVertex < vertexesNum_; ++currentVertex) {
+            answer.push_back(adjacencyTable_[vert][currentVertex] > 0);
         }
         return answer;
     }
 
-    std::vector<GraphNeighboursNode> get_neighbours(const vertex_t& vert) {
+    std::vector<GraphNeighboursNode> get_neighbours(const vertex_t& vert) const {
         std::vector<GraphNeighboursNode> answer = {};
-        for (vertex_t currentVertex; currentVertex < vertexesNum_; ++currentVertex) {
+        for (vertex_t currentVertex = 0; currentVertex < vertexesNum_; ++currentVertex) {
             answer.push_back({currentVertex, adjacencyTable_[vert][currentVertex]});
         }
         return answer;
     }
 
 private:
-    struct GraphTableNode {
-        bool is_used;
-        vertex_colours_t colour;
-    };
-
     std::vector<std::vector<weight_t>> adjacencyTable_;
 
-    bool check_connectivity_component(size_t currentVertex, std::vector<GraphTableNode>& isVertexUsed) {
-        vertex_colours_t currentColour = isVertexUsed[currentVertex].colour;
-        bool answer = true;
+    void insert_edge_oriented(const vertex_t& first, const vertex_t& second, const weight_t& weight = 1) {
+        adjacencyTable_[first][second] = weight;
+    }
 
-        for (vertex_t vertexToCheck = 0; vertexToCheck < vertexesNum_; ++vertexToCheck) {
-            if (adjacencyTable_[vertexToCheck][currentVertex]) {
-                if (!isVertexUsed[vertexToCheck].is_used) {
-                    isVertexUsed[vertexToCheck] = {true, (vertex_colours_t) (3 - currentColour)};
-                    answer = check_connectivity_component(vertexToCheck, isVertexUsed);
-                }
-                if (isVertexUsed[vertexToCheck].colour == isVertexUsed[currentVertex].colour) {
-                    return false;
-                }
-            }
-        }
-        return answer;
+    void insert_edge_not_oriented(const vertex_t& first, const vertex_t& second, const weight_t& weight = 1) {
+        adjacencyTable_[first][second] = weight;
+        adjacencyTable_[second][first] = weight;
     }
 };
+
+const int32_t Graph::UNDEFINED = INT_MAX;
+
+Graph::vertex_colours_t swap_colour(Graph::vertex_colours_t currentColour) {
+    return (currentColour == Graph::GREY_COLOUR) ? Graph::BLACK_COLOUR : Graph::GREY_COLOUR;
+}
+
+bool check_and_paint_neighbours(const Graph& graph, vertex_t currentVertex, std::vector<Graph::vertex_colours_t>& vertexColour) {
+    Graph::vertex_colours_t currentColour = vertexColour[currentVertex];
+    bool result = true;
+
+    for (vertex_t currentNeighbour : graph.get_neighbours_vertex(currentVertex)) {
+        if (vertexColour[currentNeighbour] == Graph::WHITE_COLOUR) {
+            vertexColour[currentNeighbour] = swap_colour(currentColour);
+            result = check_and_paint_neighbours(graph, currentNeighbour, vertexColour);
+        }
+        if (vertexColour[currentNeighbour] == currentColour) {
+            return false;
+        }
+    }
+    return result;
+}
+
+bool is_bipartite(const Graph& graph) {
+    std::vector<Graph::vertex_colours_t> vertexColour(graph.get_vertexes_num(), Graph::WHITE_COLOUR);
+    for (vertex_t currentVertex = 1; currentVertex < graph.get_vertexes_num() + 1; ++currentVertex) {
+        if (vertexColour[currentVertex] == Graph::WHITE_COLOUR) {
+            vertexColour[currentVertex] = Graph::GREY_COLOUR;
+            if (!check_and_paint_neighbours(graph, currentVertex, vertexColour)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
 
 int main() {
     int32_t vertexesNum = 0;
@@ -120,14 +156,14 @@ int main() {
     std::cin >> vertexesNum >> edgesNum;
     GraphTable graph(vertexesNum, edgesNum);
 
-    vertex_t first = 0;
-    vertex_t second = 0;
     for (size_t i = 0; i < edgesNum; ++i) {
+        vertex_t first = 0;
+        vertex_t second = 0;
         std::cin >> first >> second;
         graph.insert_edge(first, second);
     }
 
-    if (graph.is_bipartite()) {
+    if (is_bipartite(graph)) {
         std::cout << "YES" << std::endl;
     } else {
         std::cout << "NO" << std::endl;
