@@ -1,89 +1,156 @@
 #include <algorithm>
+#include <climits>
 #include <iostream>
 #include <vector>
 #include <queue>
 
-typedef int64_t dist_t;
-typedef int64_t vertex_t;
-typedef int64_t weight_t;
+typedef int32_t dist_t;
+typedef int32_t vertex_t;
+typedef int32_t weight_t;
 
 class Graph {
 public:
-    virtual void insert_edge(const vertex_t& first, const vertex_t& second,
-                             const weight_t& weight = 0) = 0;
+    struct GraphNeighboursNode {
+        vertex_t vertex_;
+        weight_t weight_;
+    };
 
-    virtual dist_t finding_shortest_path_with_saving(std::vector<vertex_t>& answer,
-                                                      const vertex_t& start,
-                                                      const vertex_t& end) = 0;
+    struct Edge {
+        vertex_t from_;
+        vertex_t to_;
+        weight_t weight_;
+        int32_t number_;
+
+        friend bool operator<(const Edge& first, const Edge& second) {
+            return first.from_ < second.from_ || (first.from_ == second.from_ && first.to_ <= second.to_);
+        }
+
+        friend bool operator==(const Edge& first, const Edge& second) {
+            return first.from_ == second.from_ && first.to_ == second.to_ && first.weight_ == second.weight_;
+        }
+    };
+
+    typedef enum {
+        WHITE_COLOUR = 0,
+        GREY_COLOUR = 1,
+        BLACK_COLOUR = 2,
+    } vertex_colours_t;
+
+    size_t vertexesNum_;
+    size_t edgesNum_;
+    bool isOriented_ = false;
+
+    static const int32_t UNDEFINED;
+
+    virtual std::vector<vertex_t> get_neighbours_vertex(const vertex_t& vert) const = 0;
+    virtual std::vector<weight_t> get_neighbours_weight(const vertex_t& vert) const = 0;
+    virtual std::vector<GraphNeighboursNode> get_neighbours(const vertex_t& vert) const = 0;
+    virtual void insert_edge(const vertex_t& x, const vertex_t& y, const weight_t& weight = 0) = 0;
 };
 
-// GraphList uses adjacency list for edges
 class GraphList final : public Graph {
 public:
-    explicit GraphList(size_t vertexesNum) {
+    explicit GraphList(size_t vertexesNum, size_t edgesNum = 0) {
         vertexesNum_ = vertexesNum;
-        edges_.resize(vertexesNum_, {});
-        kMaxValue_ = vertexesNum + 1;
+        edgesNum_ = edgesNum;
+        adjacencyList_.resize(vertexesNum_ + 1, {});
     }
 
-    void insert_edge(const vertex_t& first, const vertex_t& second,
-                                            const weight_t& weight = 0) {
-        edges_[first - 1].push_back(second - 1);
-        edges_[second - 1].push_back(first - 1);
-    }
-
-    dist_t finding_shortest_path_with_saving(std::vector<vertex_t>& answer,
-                                             const vertex_t& start,
-                                             const vertex_t& end) {
-        std::vector<dist_t> dist(vertexesNum_, kMaxValue_);
-        std::vector<vertex_t> prev(vertexesNum_, 0);
-        std::queue<vertex_t> tempQueue;
-
-        tempQueue.push(start - 1);
-        dist[start - 1] = 0;
-
-        vertex_t currentVertex = 0;
-
-        while (!tempQueue.empty()) {
-            currentVertex = tempQueue.front();
-            tempQueue.pop();
-
-            for (int32_t currentNeighbour : edges_[currentVertex]) {
-                if (dist[currentNeighbour] == kMaxValue_) {
-                    dist[currentNeighbour] = dist[currentVertex] + 1;
-                    prev[currentNeighbour] = currentVertex;
-
-                    tempQueue.push(currentNeighbour);
-                }
-            }
+    void insert_edge(const vertex_t& first, const vertex_t& second, const weight_t& weight = 0) {
+        if (isOriented_) {
+            insert_edge_oriented(first, second, weight);
+        } else {
+            insert_edge_not_oriented(first, second, weight);
         }
-        if (dist[end - 1] == kMaxValue_) {
-            return kErrorCode_;
-        }
-        
-        dist_t length = dist[end - 1];
-        
-        normalize_path(prev, answer, length, end - 1);
-
-        return length;
     }
-    
+
+    std::vector<vertex_t> get_neighbours_vertex(const vertex_t& vert) const {
+        std::vector<vertex_t> answer(adjacencyList_[vert].size());
+        for (size_t i = 0; i < answer.size(); ++i) {
+            answer[i] = adjacencyList_[vert][i].to_;
+        }
+        return answer;
+    }
+
+    std::vector<weight_t> get_neighbours_weight(const vertex_t& vert) const {
+        std::vector<weight_t> answer(adjacencyList_[vert].size());
+        for (size_t i = 0; i < answer.size(); ++i) {
+            answer[i] = adjacencyList_[vert][i].weight_;
+        }
+        return answer;
+    }
+
+    std::vector<GraphNeighboursNode> get_neighbours(const vertex_t& vert) const {
+        std::vector<GraphNeighboursNode> answer(adjacencyList_[vert].size());
+        for (size_t i = 0; i < answer.size(); ++i) {
+            answer[i].vertex_ = adjacencyList_[vert][i].to_;
+            answer[i].weight_ = adjacencyList_[vert][i].weight_;
+        }
+        return answer;
+    }
+
 private:
-    size_t vertexesNum_;
-    std::vector<std::vector<vertex_t>> edges_; // using adjacency list
-    size_t kMaxValue_;
-    const int8_t kErrorCode_ = -1;
+    std::vector<std::vector<Edge>> adjacencyList_; // using adjacency list
 
-    void normalize_path(const std::vector<vertex_t>& prev, std::vector<vertex_t>& answer, const dist_t& length, const vertex_t& end) {
-        vertex_t current = prev[end];
-        answer.push_back(end + 1);
+    void insert_edge_oriented(const vertex_t& first, const vertex_t& second, const weight_t& weight = 0) {
+        adjacencyList_[first].push_back({first, second, weight});
+    }
 
-        for (int32_t i = 0; i < length; ++i) {
-            answer.push_back(current + 1);
-            current = prev[current];
-        }
+    void insert_edge_not_oriented(const vertex_t& first, const vertex_t& second, const weight_t& weight = 0) {
+        adjacencyList_[first].push_back({first, second, weight});
+        adjacencyList_[second].push_back({second, first, weight});
     }
 };
+
+const int32_t Graph::UNDEFINED = INT_MAX;
+
+std::vector<vertex_t> normalize_path(const std::vector<vertex_t>& prev, const dist_t& length, const vertex_t& end) {
+    std::vector<vertex_t> answer;
+    vertex_t current = prev[end];
+    answer.push_back(end);
+
+    for (int32_t i = 0; i < length; ++i) {
+        answer.push_back(current);
+        current = prev[current];
+    }
+
+    std::reverse(answer.begin(), answer.end());
+    return answer;
+}
+
+std::vector<vertex_t> find_shortest_path_with_saving(const Graph& graph,
+                                                      const vertex_t& start,
+                                                      const vertex_t& end) {
+    std::vector<dist_t> dist(graph.vertexesNum_ + 1, Graph::UNDEFINED);
+    std::vector<vertex_t> prev(graph.vertexesNum_ + 1, 0);
+    std::queue<vertex_t> tempQueue;
+
+    tempQueue.push(start);
+    dist[start] = 0;
+
+    vertex_t currentVertex = 0;
+
+    while (!tempQueue.empty()) {
+        currentVertex = tempQueue.front();
+        tempQueue.pop();
+
+        for (vertex_t currentNeighbour : graph.get_neighbours_vertex(currentVertex)) {
+            if (dist[currentNeighbour] == Graph::UNDEFINED) {
+                dist[currentNeighbour] = dist[currentVertex] + 1;
+                prev[currentNeighbour] = currentVertex;
+
+                tempQueue.push(currentNeighbour);
+            }
+        }
+    }
+
+    dist_t length = dist[end];
+    if (length == Graph::UNDEFINED) {
+        return {};
+    }
+
+    return normalize_path(prev, length, end);
+}
 
 int main() {
     int32_t vertexNum = 0;
@@ -102,13 +169,11 @@ int main() {
         graph.insert_edge(first, second);
     }
 
-    std::vector<vertex_t> answer = {};
-    dist_t length = graph.finding_shortest_path_with_saving(answer, start, end);
+    std::vector<vertex_t> answer = find_shortest_path_with_saving(graph, start, end);
 
-    std::cout << length << std::endl;
-    for (int32_t i = 0; i < length + 1; ++i) {
-        std::cout << answer.back() << " ";
-        answer.pop_back();
+    std::cout << (int)answer.size() - 1 << std::endl;
+    for (int32_t i = 0; i < answer.size(); ++i) {
+        std::cout << answer[i] << " ";
     }
     
     return 0;
