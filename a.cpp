@@ -31,9 +31,9 @@ public:
     };
 
     typedef enum {
-        WHITE_COLOUR = 0,
-        GREY_COLOUR = 1,
-        BLACK_COLOUR = 2,
+        WHITE_COLOUR,
+        GREY_COLOUR,
+        BLACK_COLOUR,
     } vertex_colours_t;
 
     size_t vertexesNum_;
@@ -172,8 +172,8 @@ int main() {
     std::vector<vertex_t> answer = find_shortest_path_with_saving(graph, start, end);
 
     std::cout << (int)answer.size() - 1 << std::endl;
-    for (int32_t i = 0; i < answer.size(); ++i) {
-        std::cout << answer[i] << " ";
+    for (auto elem : answer) {
+        std::cout << elem << " ";
     }
     
     return 0;
