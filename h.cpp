@@ -40,38 +40,28 @@ public:
     };
 
     typedef enum {
-        WHITE_COLOUR = 0,
-        GREY_COLOUR = 1,
-        BLACK_COLOUR = 2,
+        WHITE_COLOUR,
+        GREY_COLOUR,
+        BLACK_COLOUR,
     } vertex_colours_t;
 
+    size_t vertexesNum_;
+    size_t edgesNum_;
+    bool isOriented_ = false;
+
     static const int32_t UNDEFINED;
-
-    size_t get_vertexes_num() const {
-        return vertexesNum_;
-    }
-
-    size_t get_edges_num() const {
-        return edgesNum_;
-    }
 
     virtual std::vector<vertex_t> get_neighbours_vertex(const vertex_t& vert) const = 0;
     virtual std::vector<weight_t> get_neighbours_weight(const vertex_t& vert) const = 0;
     virtual std::vector<GraphNeighboursNode> get_neighbours(const vertex_t& vert) const = 0;
     virtual void insert_edge(const vertex_t& x, const vertex_t& y, const weight_t& weight = 0) = 0;
-
-protected:
-    size_t vertexesNum_;
-    size_t edgesNum_;
-    bool isOriented_ = false;
 };
 
 class GraphList final : public Graph {
 public:
-    explicit GraphList(size_t vertexesNum, size_t edgesNum = 0, bool isOriented = false) {
+    explicit GraphList(size_t vertexesNum, size_t edgesNum = 0) {
         vertexesNum_ = vertexesNum;
         edgesNum_ = edgesNum;
-        isOriented_ = isOriented;
         adjacencyList_.resize(vertexesNum_ + 1, {});
     }
 
