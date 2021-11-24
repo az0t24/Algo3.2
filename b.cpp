@@ -77,7 +77,7 @@ public:
 
     std::vector<vertex_t> get_neighbours_vertex(const vertex_t& vert) const {
         std::vector<vertex_t> answer = {};
-        for (vertex_t currentVertex = 0; currentVertex < vertexesNum_; ++currentVertex) {
+        for (vertex_t currentVertex = 0; currentVertex < vertexesNum_ + 1; ++currentVertex) {
             if (adjacencyTable_[vert][currentVertex] > 0) {
                 answer.push_back(currentVertex);
             }
@@ -87,7 +87,7 @@ public:
 
     std::vector<weight_t> get_neighbours_weight(const vertex_t& vert) const {
         std::vector<weight_t> answer = {};
-        for (vertex_t currentVertex = 0; currentVertex < vertexesNum_; ++currentVertex) {
+        for (vertex_t currentVertex = 0; currentVertex < vertexesNum_ + 1; ++currentVertex) {
             answer.push_back(adjacencyTable_[vert][currentVertex] > 0);
         }
         return answer;
@@ -95,7 +95,7 @@ public:
 
     std::vector<GraphNeighboursNode> get_neighbours(const vertex_t& vert) const {
         std::vector<GraphNeighboursNode> answer = {};
-        for (vertex_t currentVertex = 0; currentVertex < vertexesNum_; ++currentVertex) {
+        for (vertex_t currentVertex = 0; currentVertex < vertexesNum_ + 1; ++currentVertex) {
             answer.push_back({currentVertex, adjacencyTable_[vert][currentVertex]});
         }
         return answer;
@@ -116,32 +116,32 @@ private:
 
 const int32_t Graph::UNDEFINED = INT_MAX;
 
-Graph::vertex_colours_t swap_colour(Graph::vertex_colours_t currentColour) {
+Graph::vertex_colours_t swap_colour(const Graph::vertex_colours_t currentColour) {
     return (currentColour == Graph::GREY_COLOUR) ? Graph::BLACK_COLOUR : Graph::GREY_COLOUR;
 }
 
-bool check_and_paint_neighbours(const Graph& graph, vertex_t currentVertex, std::vector<Graph::vertex_colours_t>& vertexColour) {
+bool check_neighbours_colour(const Graph& graph, const vertex_t& currentVertex, std::vector<Graph::vertex_colours_t>& vertexColour) {
     Graph::vertex_colours_t currentColour = vertexColour[currentVertex];
-    bool result = true;
+    bool is_comp_ok = true;
 
     for (vertex_t currentNeighbour : graph.get_neighbours_vertex(currentVertex)) {
         if (vertexColour[currentNeighbour] == Graph::WHITE_COLOUR) {
             vertexColour[currentNeighbour] = swap_colour(currentColour);
-            result = check_and_paint_neighbours(graph, currentNeighbour, vertexColour);
+            is_comp_ok = check_neighbours_colour(graph, currentNeighbour, vertexColour);
         }
         if (vertexColour[currentNeighbour] == currentColour) {
             return false;
         }
     }
-    return result;
+    return is_comp_ok;
 }
 
 bool is_bipartite(const Graph& graph) {
-    std::vector<Graph::vertex_colours_t> vertexColour(graph.get_vertexes_num(), Graph::WHITE_COLOUR);
+    std::vector<Graph::vertex_colours_t> vertexColour(graph.get_vertexes_num() + 1, Graph::WHITE_COLOUR);
     for (vertex_t currentVertex = 1; currentVertex < graph.get_vertexes_num() + 1; ++currentVertex) {
         if (vertexColour[currentVertex] == Graph::WHITE_COLOUR) {
             vertexColour[currentVertex] = Graph::GREY_COLOUR;
-            if (!check_and_paint_neighbours(graph, currentVertex, vertexColour)) {
+            if (!check_neighbours_colour(graph, currentVertex, vertexColour)) {
                 return false;
             }
         }
